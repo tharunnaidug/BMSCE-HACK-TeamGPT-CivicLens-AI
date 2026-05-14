@@ -19,7 +19,7 @@ router.get(
 );
 
 router.post(
-  "/complaints/:id/update",
+  "/complaints/update",
   protect,
   isSubAdmin,
   updateComplaint

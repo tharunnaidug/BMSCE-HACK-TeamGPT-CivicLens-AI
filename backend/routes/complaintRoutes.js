@@ -10,6 +10,7 @@ import {
   getSingleComplaint,
   getNearbyComplaints,
   getGeoJSONComplaints,
+  getComplaintHistory,
 } from "../controllers/complaintController.js";
 
 const router = express.Router();
@@ -41,6 +42,11 @@ router.get(
   "/:id",
   protect,
   getSingleComplaint
+);
+router.get(
+  "/:id/history",
+  protect,
+  getComplaintHistory
 );
 
 export default router;

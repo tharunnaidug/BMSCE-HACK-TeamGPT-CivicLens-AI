@@ -6,21 +6,117 @@ import pool from "../config/db.js";
 const getActiveComplaints = async (req, res) => {
   try {
 
-    const complaints = await pool.query(
-      `
-      SELECT *
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      severity,
+      label,
+      search,
+    } = req.query;
+
+    const offset =
+      (page - 1) * limit;
+
+    let query = `
+      SELECT
+      complaints.*,
+      users.name,
+      users.email,
+      users.photo_url
+
       FROM complaints
 
-      WHERE status != 'resolved'
-      AND status != 'rejected'
-      AND is_deleted=FALSE
+      LEFT JOIN users
+      ON complaints.user_id = users.id
 
-      ORDER BY created_at DESC
-      `
-    );
+      WHERE complaints.status != 'resolved'
+
+      AND complaints.status != 'rejected'
+
+      AND complaints.is_deleted=FALSE
+    `;
+
+    const values = [];
+
+    let index = 1;
+
+    // ================= STATUS FILTER =================
+
+    if (status) {
+      query += `
+        AND complaints.status=$${index}
+      `;
+
+      values.push(status);
+
+      index++;
+    }
+
+    // ================= SEVERITY FILTER =================
+
+    if (severity) {
+      query += `
+        AND complaints.severity=$${index}
+      `;
+
+      values.push(severity);
+
+      index++;
+    }
+
+    // ================= LABEL FILTER =================
+
+    if (label) {
+      query += `
+        AND complaints.ai_label=$${index}
+      `;
+
+      values.push(label);
+
+      index++;
+    }
+
+    // ================= SEARCH =================
+
+    if (search) {
+      query += `
+        AND (
+          complaints.title ILIKE $${index}
+          OR
+          complaints.description ILIKE $${index}
+        )
+      `;
+
+      values.push(`%${search}%`);
+
+      index++;
+    }
+
+    // ================= PAGINATION =================
+
+    query += `
+      ORDER BY complaints.created_at DESC
+      LIMIT $${index}
+      OFFSET $${index + 1}
+    `;
+
+    values.push(limit);
+
+    values.push(offset);
+
+    const complaints =
+      await pool.query(query, values);
 
     res.status(200).json({
       success: true,
+
+      page: Number(page),
+
+      limit: Number(limit),
+
+      total: complaints.rows.length,
+
       complaints: complaints.rows,
     });
 
@@ -42,6 +138,7 @@ const updateComplaint = async (req, res) => {
   try {
 
     const {
+      complaint_id,
       status,
       remarks,
       resolved_image_url,
@@ -53,7 +150,7 @@ const updateComplaint = async (req, res) => {
       FROM complaints
       WHERE id=$1
       `,
-      [req.params.id]
+      [complaint_id]
     );
 
     if (complaintData.rows.length === 0) {
@@ -63,31 +160,33 @@ const updateComplaint = async (req, res) => {
       });
     }
 
-    const complaint = complaintData.rows[0];
+    const complaint =
+      complaintData.rows[0];
 
     // ================= UPDATE =================
 
-    const updatedComplaint = await pool.query(
-      `
-      UPDATE complaints
+    const updatedComplaint =
+      await pool.query(
+        `
+        UPDATE complaints
 
-      SET
-      status=$1,
-      admin_response=$2,
-      resolved_image_url=$3,
-      updated_at=NOW()
+        SET
+        status=$1,
+        admin_response=$2,
+        resolved_image_url=$3,
+        updated_at=NOW()
 
-      WHERE id=$4
+        WHERE id=$4
 
-      RETURNING *
-      `,
-      [
-        status,
-        remarks,
-        resolved_image_url,
-        req.params.id,
-      ]
-    );
+        RETURNING *
+        `,
+        [
+          status,
+          remarks,
+          resolved_image_url,
+          complaint_id,
+        ]
+      );
 
     // ================= HISTORY =================
 
@@ -105,7 +204,7 @@ const updateComplaint = async (req, res) => {
       VALUES($1,$2,$3,$4,$5,$6)
       `,
       [
-        req.params.id,
+        complaint_id,
         req.user.id,
         complaint.status,
         status,
@@ -117,7 +216,8 @@ const updateComplaint = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Complaint updated",
-      complaint: updatedComplaint.rows[0],
+      complaint:
+        updatedComplaint.rows[0],
     });
 
   } catch (error) {

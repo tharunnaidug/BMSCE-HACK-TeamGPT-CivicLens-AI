@@ -20,14 +20,14 @@ router.get(
 );
 
 router.post(
-  "/complaints/:id/status",
+  "/complaints/status",
   protect,
   isAdmin,
   updateComplaintStatus
 );
 
 router.post(
-  "/complaints/:id",
+  "/complaints/delete",
   protect,
   isAdmin,
   deleteComplaint

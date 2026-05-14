@@ -6,12 +6,24 @@ import pool from "../config/db.js";
 const getAllComplaints = async (req, res) => {
   try {
 
-    const complaints = await pool.query(
-      `
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      severity,
+      label,
+      search,
+    } = req.query;
+
+    const offset =
+      (page - 1) * limit;
+
+    let query = `
       SELECT
       complaints.*,
       users.name,
-      users.email
+      users.email,
+      users.photo_url
 
       FROM complaints
 
@@ -19,13 +31,88 @@ const getAllComplaints = async (req, res) => {
       ON complaints.user_id = users.id
 
       WHERE complaints.is_deleted=FALSE
+    `;
 
+    const values = [];
+
+    let index = 1;
+
+    // ================= STATUS FILTER =================
+
+    if (status) {
+      query += `
+        AND complaints.status=$${index}
+      `;
+
+      values.push(status);
+
+      index++;
+    }
+
+    // ================= SEVERITY FILTER =================
+
+    if (severity) {
+      query += `
+        AND complaints.severity=$${index}
+      `;
+
+      values.push(severity);
+
+      index++;
+    }
+
+    // ================= LABEL FILTER =================
+
+    if (label) {
+      query += `
+        AND complaints.ai_label=$${index}
+      `;
+
+      values.push(label);
+
+      index++;
+    }
+
+    // ================= SEARCH =================
+
+    if (search) {
+      query += `
+        AND (
+          complaints.title ILIKE $${index}
+          OR
+          complaints.description ILIKE $${index}
+        )
+      `;
+
+      values.push(`%${search}%`);
+
+      index++;
+    }
+
+    // ================= PAGINATION =================
+
+    query += `
       ORDER BY complaints.created_at DESC
-      `
-    );
+      LIMIT $${index}
+      OFFSET $${index + 1}
+    `;
+
+    values.push(limit);
+
+    values.push(offset);
+
+    const complaints =
+      await pool.query(query, values);
 
     res.status(200).json({
       success: true,
+
+      page: Number(page),
+
+      limit: Number(limit),
+
+      total: complaints.rows.length,
+
       complaints: complaints.rows,
     });
 
@@ -46,7 +133,11 @@ const getAllComplaints = async (req, res) => {
 const updateComplaintStatus = async (req, res) => {
   try {
 
-    const { status, remarks } = req.body;
+    const {
+      complaint_id,
+      status,
+      remarks,
+    } = req.body;
 
     const complaintData = await pool.query(
       `
@@ -54,7 +145,7 @@ const updateComplaintStatus = async (req, res) => {
       FROM complaints
       WHERE id=$1
       `,
-      [req.params.id]
+      [complaint_id]
     );
 
     if (complaintData.rows.length === 0) {
@@ -64,31 +155,33 @@ const updateComplaintStatus = async (req, res) => {
       });
     }
 
-    const complaint = complaintData.rows[0];
+    const complaint =
+      complaintData.rows[0];
 
-    // ================= UPDATE COMPLAINT =================
+    // ================= UPDATE =================
 
-    const updatedComplaint = await pool.query(
-      `
-      UPDATE complaints
+    const updatedComplaint =
+      await pool.query(
+        `
+        UPDATE complaints
 
-      SET
-      status=$1,
-      admin_response=$2,
-      updated_at=NOW()
+        SET
+        status=$1,
+        admin_response=$2,
+        updated_at=NOW()
 
-      WHERE id=$3
+        WHERE id=$3
 
-      RETURNING *
-      `,
-      [
-        status,
-        remarks,
-        req.params.id,
-      ]
-    );
+        RETURNING *
+        `,
+        [
+          status,
+          remarks,
+          complaint_id,
+        ]
+      );
 
-    // ================= HISTORY ENTRY =================
+    // ================= HISTORY =================
 
     await pool.query(
       `
@@ -103,7 +196,7 @@ const updateComplaintStatus = async (req, res) => {
       VALUES($1,$2,$3,$4,$5)
       `,
       [
-        req.params.id,
+        complaint_id,
         req.user.id,
         complaint.status,
         status,
@@ -113,8 +206,9 @@ const updateComplaintStatus = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Complaint status updated",
-      complaint: updatedComplaint.rows[0],
+      message: "Complaint updated",
+      complaint:
+        updatedComplaint.rows[0],
     });
 
   } catch (error) {
@@ -128,10 +222,13 @@ const updateComplaintStatus = async (req, res) => {
   }
 };
 
+
 // ================= SOFT DELETE =================
 
 const deleteComplaint = async (req, res) => {
   try {
+
+    const { complaint_id } = req.body;
 
     await pool.query(
       `
@@ -141,7 +238,7 @@ const deleteComplaint = async (req, res) => {
 
       WHERE id=$1
       `,
-      [req.params.id]
+      [complaint_id]
     );
 
     res.status(200).json({

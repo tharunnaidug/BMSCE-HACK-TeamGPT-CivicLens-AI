@@ -309,7 +309,70 @@ const getGeoJSONComplaints = async (req, res) => {
     });
   }
 };
+const getComplaintHistory = async (req, res) => {
+  try {
 
+    const complaintId = req.params.id;
+
+    // ================= CHECK COMPLAINT =================
+
+    const complaintData = await pool.query(
+      `
+      SELECT *
+      FROM complaints
+      WHERE id=$1
+      AND is_deleted=FALSE
+      `,
+      [complaintId]
+    );
+
+    if (complaintData.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    // ================= GET HISTORY =================
+
+    const history = await pool.query(
+      `
+      SELECT
+      complaint_updates.*,
+      users.name,
+      users.email,
+      users.photo_url
+
+      FROM complaint_updates
+
+      LEFT JOIN users
+      ON complaint_updates.updated_by = users.id
+
+      WHERE complaint_updates.complaint_id=$1
+
+      ORDER BY complaint_updates.created_at ASC
+      `,
+      [complaintId]
+    );
+
+    res.status(200).json({
+      success: true,
+
+      complaint: complaintData.rows[0],
+
+      history: history.rows,
+    });
+
+  } catch (error) {
+
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
 
 export {
   createComplaint,
@@ -317,4 +380,5 @@ export {
   getSingleComplaint,
   getNearbyComplaints,
   getGeoJSONComplaints,
+  getComplaintHistory
 };
