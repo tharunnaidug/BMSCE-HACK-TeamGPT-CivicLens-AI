@@ -11,10 +11,11 @@ import setupDatabase from "./config/setupDatabase.js";
 
 // ================= ROUTES =================
 
+import geoRoutes from "./routes/geoRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-
+import errorHandler from "./middleware/errorMiddleware.js";
 import complaintRoutes from "./routes/complaintRoutes.js";
-
+import notificationRoutes from "./routes/notificationRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 
 import subAdminRoutes from "./routes/subAdminRoutes.js";
@@ -44,7 +45,7 @@ app.use(cookieParser());
 app.use(helmet());
 
 app.use(morgan("dev"));
-
+app.use(errorHandler);
 
 // ================= API ROUTES =================
 
@@ -57,7 +58,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/subadmin", subAdminRoutes);
 
 app.use("/api/dashboard", dashboardRoutes);
-
+app.use("/api/geo", geoRoutes);
+app.use("/api/notifications",notificationRoutes);
 
 // ================= ROOT ROUTE =================
 

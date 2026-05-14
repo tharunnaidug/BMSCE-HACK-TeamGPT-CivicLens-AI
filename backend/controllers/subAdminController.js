@@ -4,21 +4,21 @@ import pool from "../config/db.js";
 // ================= GET ACTIVE COMPLAINTS =================
 
 const getActiveComplaints = async (req, res) => {
-  try {
+    try {
 
-    const {
-      page = 1,
-      limit = 10,
-      status,
-      severity,
-      label,
-      search,
-    } = req.query;
+        const {
+            page = 1,
+            limit = 10,
+            status,
+            severity,
+            label,
+            search,
+        } = req.query;
 
-    const offset =
-      (page - 1) * limit;
+        const offset =
+            (page - 1) * limit;
 
-    let query = `
+        let query = `
       SELECT
       complaints.*,
       users.name,
@@ -37,50 +37,50 @@ const getActiveComplaints = async (req, res) => {
       AND complaints.is_deleted=FALSE
     `;
 
-    const values = [];
+        const values = [];
 
-    let index = 1;
+        let index = 1;
 
-    // ================= STATUS FILTER =================
+        // ================= STATUS FILTER =================
 
-    if (status) {
-      query += `
+        if (status) {
+            query += `
         AND complaints.status=$${index}
       `;
 
-      values.push(status);
+            values.push(status);
 
-      index++;
-    }
+            index++;
+        }
 
-    // ================= SEVERITY FILTER =================
+        // ================= SEVERITY FILTER =================
 
-    if (severity) {
-      query += `
+        if (severity) {
+            query += `
         AND complaints.severity=$${index}
       `;
 
-      values.push(severity);
+            values.push(severity);
 
-      index++;
-    }
+            index++;
+        }
 
-    // ================= LABEL FILTER =================
+        // ================= LABEL FILTER =================
 
-    if (label) {
-      query += `
+        if (label) {
+            query += `
         AND complaints.ai_label=$${index}
       `;
 
-      values.push(label);
+            values.push(label);
 
-      index++;
-    }
+            index++;
+        }
 
-    // ================= SEARCH =================
+        // ================= SEARCH =================
 
-    if (search) {
-      query += `
+        if (search) {
+            query += `
         AND (
           complaints.title ILIKE $${index}
           OR
@@ -88,86 +88,86 @@ const getActiveComplaints = async (req, res) => {
         )
       `;
 
-      values.push(`%${search}%`);
+            values.push(`%${search}%`);
 
-      index++;
-    }
+            index++;
+        }
 
-    // ================= PAGINATION =================
+        // ================= PAGINATION =================
 
-    query += `
+        query += `
       ORDER BY complaints.created_at DESC
       LIMIT $${index}
       OFFSET $${index + 1}
     `;
 
-    values.push(limit);
+        values.push(limit);
 
-    values.push(offset);
+        values.push(offset);
 
-    const complaints =
-      await pool.query(query, values);
+        const complaints =
+            await pool.query(query, values);
 
-    res.status(200).json({
-      success: true,
+        res.status(200).json({
+            success: true,
 
-      page: Number(page),
+            page: Number(page),
 
-      limit: Number(limit),
+            limit: Number(limit),
 
-      total: complaints.rows.length,
+            total: complaints.rows.length,
 
-      complaints: complaints.rows,
-    });
+            complaints: complaints.rows,
+        });
 
-  } catch (error) {
+    } catch (error) {
 
-    console.log(error);
+        console.log(error);
 
-    res.status(500).json({
-      success: false,
-      message: "Server Error",
-    });
-  }
+        res.status(500).json({
+            success: false,
+            message: "Server Error",
+        });
+    }
 };
 
 
 // ================= UPDATE COMPLAINT =================
 
 const updateComplaint = async (req, res) => {
-  try {
+    try {
 
-    const {
-      complaint_id,
-      status,
-      remarks,
-      resolved_image_url,
-    } = req.body;
+        const {
+            complaint_id,
+            status,
+            remarks,
+            resolved_image_url,
+        } = req.body;
 
-    const complaintData = await pool.query(
-      `
+        const complaintData = await pool.query(
+            `
       SELECT *
       FROM complaints
       WHERE id=$1
       `,
-      [complaint_id]
-    );
+            [complaint_id]
+        );
 
-    if (complaintData.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Complaint not found",
-      });
-    }
+        if (complaintData.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Complaint not found",
+            });
+        }
 
-    const complaint =
-      complaintData.rows[0];
+        const complaint =
+            complaintData.rows[0];
 
-    // ================= UPDATE =================
+        // ================= UPDATE =================
 
-    const updatedComplaint =
-      await pool.query(
-        `
+        const updatedComplaint =
+            await pool.query(
+                `
         UPDATE complaints
 
         SET
@@ -180,18 +180,18 @@ const updateComplaint = async (req, res) => {
 
         RETURNING *
         `,
-        [
-          status,
-          remarks,
-          resolved_image_url,
-          complaint_id,
-        ]
-      );
+                [
+                    status,
+                    remarks,
+                    resolved_image_url,
+                    complaint_id,
+                ]
+            );
 
-    // ================= HISTORY =================
+        // ================= HISTORY =================
 
-    await pool.query(
-      `
+        await pool.query(
+            `
       INSERT INTO complaint_updates(
         complaint_id,
         updated_by,
@@ -203,36 +203,57 @@ const updateComplaint = async (req, res) => {
 
       VALUES($1,$2,$3,$4,$5,$6)
       `,
-      [
-        complaint_id,
-        req.user.id,
-        complaint.status,
-        status,
-        remarks,
-        resolved_image_url,
-      ]
-    );
+            [
+                complaint_id,
+                req.user.id,
+                complaint.status,
+                status,
+                remarks,
+                resolved_image_url,
+            ]
+        );
 
-    res.status(200).json({
-      success: true,
-      message: "Complaint updated",
-      complaint:
-        updatedComplaint.rows[0],
-    });
+        // ================= CREATE NOTIFICATION =================
 
-  } catch (error) {
+        await pool.query(
+            `
+    INSERT INTO notifications(
+      user_id,
+      complaint_id,
+      title,
+      message
+    )
+  
+    VALUES($1,$2,$3,$4)
+    `,
+            [
+                complaint.user_id,
+                complaint_id,
+                "Complaint Updated",
+                `Your complaint is now marked as ${status}`,
+            ]
+        );
 
-    console.log(error);
+        res.status(200).json({
+            success: true,
+            message: "Complaint updated",
+            complaint:
+                updatedComplaint.rows[0],
+        });
 
-    res.status(500).json({
-      success: false,
-      message: "Server Error",
-    });
-  }
+    } catch (error) {
+
+        console.log(error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server Error",
+        });
+    }
 };
 
 
 export {
-  getActiveComplaints,
-  updateComplaint,
+    getActiveComplaints,
+    updateComplaint,
 };

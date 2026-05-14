@@ -3,19 +3,19 @@ import pool from "./db.js";
 import { genSalt, hash } from "bcryptjs";
 
 const setupDatabase = async () => {
-  try {
+    try {
 
-    console.log("Setting up database...");
+        console.log("Setting up database...");
 
-    // ================= ENABLE POSTGIS =================
+        // ================= ENABLE POSTGIS =================
 
-    await pool.query(`
+        await pool.query(`
       CREATE EXTENSION IF NOT EXISTS postgis;
     `);
 
-    // ================= USERS TABLE =================
+        // ================= USERS TABLE =================
 
-    await pool.query(`
+        await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
 
         id SERIAL PRIMARY KEY,
@@ -36,16 +36,16 @@ const setupDatabase = async () => {
       );
     `);
 
-    // ================= SAFE COLUMN UPDATES =================
+        // ================= SAFE COLUMN UPDATES =================
 
-    await pool.query(`
+        await pool.query(`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS photo_url TEXT;
     `);
 
-    // ================= COMPLAINTS TABLE =================
+        // ================= COMPLAINTS TABLE =================
 
-    await pool.query(`
+        await pool.query(`
       CREATE TABLE IF NOT EXISTS complaints (
 
         id SERIAL PRIMARY KEY,
@@ -90,9 +90,9 @@ const setupDatabase = async () => {
       );
     `);
 
-    // ================= COMPLAINT UPDATES =================
+        // ================= COMPLAINT UPDATES =================
 
-    await pool.query(`
+        await pool.query(`
       CREATE TABLE IF NOT EXISTS complaint_updates (
 
         id SERIAL PRIMARY KEY,
@@ -113,45 +113,66 @@ const setupDatabase = async () => {
       );
     `);
 
-    console.log("Tables created successfully");
+        // ================= NOTIFICATIONS TABLE =================
+
+        await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+  
+      id SERIAL PRIMARY KEY,
+  
+      user_id INTEGER REFERENCES users(id),
+  
+      complaint_id INTEGER REFERENCES complaints(id),
+  
+      title TEXT,
+  
+      message TEXT,
+  
+      is_read BOOLEAN DEFAULT FALSE,
+  
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+        console.log("Tables created successfully");
 
 
-    // ================= CREATE SUB ADMINS =================
+        // ================= CREATE SUB ADMINS =================
 
-    const subAdmins = [
-      {
-        name: "Sub Admin 1",
-        email: "subadmin1@civiclens.com",
-        password: "123456",
-      },
-      {
-        name: "Sub Admin 2",
-        email: "subadmin2@civiclens.com",
-        password: "123456",
-      },
-    ];
+        const subAdmins = [
+            {
+                name: "Sub Admin 1",
+                email: "subadmin1@civiclens.com",
+                password: "123456",
+            },
+            {
+                name: "Sub Admin 2",
+                email: "subadmin2@civiclens.com",
+                password: "123456",
+            },
+        ];
 
-    for (const admin of subAdmins) {
+        for (const admin of subAdmins) {
 
-      const existing = await pool.query(
-        `
+            const existing = await pool.query(
+                `
         SELECT * FROM users
         WHERE email=$1
         `,
-        [admin.email]
-      );
+                [admin.email]
+            );
 
-      if (existing.rows.length === 0) {
+            if (existing.rows.length === 0) {
 
-        const salt = await genSalt(10);
+                const salt = await genSalt(10);
 
-        const hashedPassword = await hash(
-          admin.password,
-          salt
-        );
+                const hashedPassword = await hash(
+                    admin.password,
+                    salt
+                );
 
-        await pool.query(
-          `
+                await pool.query(
+                    `
           INSERT INTO users(
             name,
             email,
@@ -161,32 +182,32 @@ const setupDatabase = async () => {
 
           VALUES($1,$2,$3,$4)
           `,
-          [
-            admin.name,
-            admin.email,
-            hashedPassword,
-            "sub_admin",
-          ]
-        );
+                    [
+                        admin.name,
+                        admin.email,
+                        hashedPassword,
+                        "sub_admin",
+                    ]
+                );
 
-        console.log(
-          `${admin.email} created`
-        );
+                console.log(
+                    `${admin.email} created`
+                );
 
-      } else {
+            } else {
 
-        console.log(
-          `${admin.email} already exists`
-        );
-      }
+                console.log(
+                    `${admin.email} already exists`
+                );
+            }
+        }
+
+        console.log("Database setup completed");
+
+    } catch (error) {
+
+        console.log(error);
     }
-
-    console.log("Database setup completed");
-
-  } catch (error) {
-
-    console.log(error);
-  }
 };
 
 export default setupDatabase;
