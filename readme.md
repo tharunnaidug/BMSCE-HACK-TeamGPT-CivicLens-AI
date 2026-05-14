@@ -88,3 +88,9 @@ PORT=5000
 DATABASE_URL=postgresql://postgres:password@localhost:5432/civiclens
 
 JWT_SECRET=your_secret_key
+
+
+test logins (defualt)
+
+emailid: subadmin1@civiclens.com
+pass:123456
