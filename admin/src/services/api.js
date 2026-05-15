@@ -1,6 +1,8 @@
 // ================= API SERVICE LAYER =================
 
+<<<<<<< HEAD
 const API_BASE = 'http://localhost:5000/api';
+>>>>>>> fe861fadfeb89d10f5e9b67710ef4f51144f01cc
 
 // ================= FETCH WRAPPER =================
 

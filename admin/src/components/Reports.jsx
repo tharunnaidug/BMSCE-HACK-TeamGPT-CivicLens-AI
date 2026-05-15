@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Eye, X, UploadCloud, Check, Loader2, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Eye, X, UploadCloud, Check, Loader2, Trash2, ImagePlus } from 'lucide-react';
 import { getComplaints, getSubAdminComplaints, updateComplaintStatus, updateSubAdminComplaint, deleteComplaint } from '../services/api';
+import uploadImage from '../utils/uploadImage';
 
 const Reports = ({ role }) => {
   const [complaints, setComplaints] = useState([]);
@@ -8,6 +9,7 @@ const Reports = ({ role }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -15,6 +17,8 @@ const Reports = ({ role }) => {
   const [newStatus, setNewStatus] = useState('');
   const [remarks, setRemarks] = useState('');
   const [resolvedImageUrl, setResolvedImageUrl] = useState('');
+
+  const fileInputRef = useRef(null);
 
   const fetchComplaints = async () => {
     setLoading(true);
@@ -54,6 +58,31 @@ const Reports = ({ role }) => {
     setNewStatus(report.status);
     setRemarks(report.admin_response || '');
     setResolvedImageUrl(report.resolved_image_url || '');
+  };
+
+  // ================= IMAGE UPLOAD HANDLER =================
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const result = await uploadImage(file);
+
+    if (result.success) {
+      setResolvedImageUrl(result.url);
+      // Auto-set status to resolved when photo uploaded
+      if (newStatus !== 'resolved') {
+        setNewStatus('resolved');
+      }
+    } else {
+      alert(result.message || 'Image upload failed. Please try again.');
+    }
+    setUploading(false);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSaveChanges = async () => {
@@ -116,9 +145,9 @@ const Reports = ({ role }) => {
       <div className="flex justify-between items-center mb-4">
         <h2>Manage Reports</h2>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <select 
-            className="select-input" 
-            value={statusFilter} 
+          <select
+            className="select-input"
+            value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             style={{ width: '160px' }}
           >
@@ -129,10 +158,10 @@ const Reports = ({ role }) => {
           </select>
           <div className="flex items-center" style={{ width: '260px', position: 'relative' }}>
             <Search size={18} style={{ position: 'absolute', left: '10px', color: 'var(--text-muted)' }} />
-            <input 
-              type="text" 
-              placeholder="Search reports..." 
-              className="text-input" 
+            <input
+              type="text"
+              placeholder="Search reports..."
+              className="text-input"
               style={{ paddingLeft: '2.5rem' }}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -198,14 +227,14 @@ const Reports = ({ role }) => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button 
+                          <button
                             className="btn btn-outline"
                             onClick={() => openReportModal(complaint)}
                           >
                             <Eye size={16} /> View
                           </button>
                           {role === 'admin' && (
-                            <button 
+                            <button
                               className="btn btn-outline"
                               style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}
                               onClick={() => handleDelete(complaint.id)}
@@ -234,8 +263,9 @@ const Reports = ({ role }) => {
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="modal-body">
+              {/* Issue Photo */}
               <div className="form-group">
                 <label className="form-label">Issue Photo</label>
                 {selectedReport.image_url ? (
@@ -247,6 +277,7 @@ const Reports = ({ role }) => {
                 )}
               </div>
 
+              {/* Description */}
               <div className="form-group">
                 <label className="form-label">Description</label>
                 <p style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
@@ -264,25 +295,24 @@ const Reports = ({ role }) => {
                 </div>
               )}
 
-              {/* Status & Remarks for both admin and subadmin */}
-              <div className="flex gap-4 mb-4">
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label className="form-label">Update Status</label>
-                  <select 
-                    className="select-input" 
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
-                  >
-                    {(role === 'subadmin' ? subAdminStatuses : adminStatuses).map(s => (
-                      <option key={s} value={s}>{formatStatus(s)}</option>
-                    ))}
-                  </select>
-                </div>
+              {/* Status */}
+              <div className="form-group">
+                <label className="form-label">Update Status</label>
+                <select
+                  className="select-input"
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                >
+                  {(role === 'subadmin' ? subAdminStatuses : adminStatuses).map(s => (
+                    <option key={s} value={s}>{formatStatus(s)}</option>
+                  ))}
+                </select>
               </div>
 
+              {/* Remarks */}
               <div className="form-group">
                 <label className="form-label">Remarks / Response</label>
-                <textarea 
+                <textarea
                   className="text-input"
                   rows={3}
                   value={remarks}
@@ -292,35 +322,68 @@ const Reports = ({ role }) => {
                 />
               </div>
 
-              {/* Resolved image URL for subadmin */}
+              {/* Completion Photo Upload — SubAdmin only */}
               {role === 'subadmin' && (
                 <div className="form-group">
-                  <label className="form-label">Completion Photo URL</label>
-                  <input 
-                    type="text"
-                    className="text-input"
-                    value={resolvedImageUrl}
-                    onChange={(e) => setResolvedImageUrl(e.target.value)}
-                    placeholder="https://... (paste image URL after uploading)"
-                  />
-                  {resolvedImageUrl && (
-                    <div style={{ position: 'relative', marginTop: '0.75rem' }}>
+                  <label className="form-label">Completion Photo</label>
+
+                  {resolvedImageUrl ? (
+                    // Show uploaded image with verified badge + option to re-upload
+                    <div style={{ position: 'relative' }}>
                       <img src={resolvedImageUrl} alt="Completed" className="image-preview" />
-                      <div style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'var(--status-completed)', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 600, color: 'white' }}>
-                        <Check size={16} /> Proof
+                      <div style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: '#22c55e', padding: '0.25rem 0.75rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600, color: 'white' }}>
+                        <Check size={14} /> Uploaded
                       </div>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{ marginTop: '0.75rem', width: '100%', fontSize: '0.85rem' }}
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        <ImagePlus size={16} /> Replace Photo
+                      </button>
+                    </div>
+                  ) : (
+                    // Upload zone
+                    <div
+                      className="upload-zone"
+                      onClick={() => !uploading && fileInputRef.current?.click()}
+                      style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.7 : 1 }}
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 size={36} style={{ margin: '0 auto 0.75rem', display: 'block', animation: 'spin 1s linear infinite', color: 'var(--accent-primary)' }} />
+                          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Uploading to ImgBB...</p>
+                        </>
+                      ) : (
+                        <>
+                          <UploadCloud size={36} style={{ margin: '0 auto 0.75rem', display: 'block', color: 'var(--text-muted)' }} />
+                          <h4 style={{ color: 'var(--text-primary)', marginBottom: '0.4rem' }}>Click to Upload Completion Photo</h4>
+                          <p className="text-muted" style={{ fontSize: '0.8rem' }}>PNG, JPG, WEBP supported</p>
+                        </>
+                      )}
                     </div>
                   )}
+
+                  {/* Hidden file input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleImageUpload}
+                  />
                 </div>
               )}
             </div>
-            
+
             <div className="modal-footer">
               <button className="btn btn-outline" onClick={() => setSelectedReport(null)}>Close</button>
-              <button 
-                className="btn btn-primary" 
+              <button
+                className="btn btn-primary"
                 onClick={handleSaveChanges}
-                disabled={saving}
+                disabled={saving || uploading}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >
                 {saving ? (
