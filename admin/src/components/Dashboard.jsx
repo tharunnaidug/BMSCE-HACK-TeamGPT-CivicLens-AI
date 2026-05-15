@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Inbox, ArrowUpRight, CheckCircle2, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
-import { getDashboardStats, getComplaints } from '../services/api';
+import { Inbox, ArrowUpRight, CheckCircle2, AlertTriangle, Clock, Loader2 } from 'lucide-react';
+import { getDashboardStats, getComplaints, getSubAdminComplaints } from '../services/api';
 
 const Dashboard = ({ role }) => {
   const [stats, setStats] = useState(null);
@@ -14,13 +14,28 @@ const Dashboard = ({ role }) => {
       setError('');
 
       try {
-        const [statsRes, complaintsRes] = await Promise.all([
-          getDashboardStats(),
-          getComplaints({ limit: 5 }),
-        ]);
+        if (role === 'admin') {
+          // ====== ADMIN: fetch stats + all complaints ======
+          const [statsRes, complaintsRes] = await Promise.all([
+            getDashboardStats(),
+            getComplaints({ limit: 5 }),
+          ]);
+          setStats(statsRes.stats);
+          setRecentComplaints(complaintsRes.complaints || []);
+        } else {
+          // ====== SUBADMIN: only fetch active complaints assigned to them ======
+          const complaintsRes = await getSubAdminComplaints({ limit: 5 });
+          const items = complaintsRes.complaints || [];
+          setRecentComplaints(items);
 
-        setStats(statsRes.stats);
-        setRecentComplaints(complaintsRes.complaints || []);
+          // Build mini stats from the returned complaints
+          setStats({
+            total: items.length,
+            pending: items.filter(c => c.status === 'pending').length,
+            in_progress: items.filter(c => c.status === 'in_progress').length,
+            resolved: items.filter(c => c.status === 'resolved').length,
+          });
+        }
       } catch (err) {
         setError(err.message || 'Failed to load dashboard data');
       } finally {
@@ -29,7 +44,7 @@ const Dashboard = ({ role }) => {
     };
 
     fetchData();
-  }, []);
+  }, [role]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
@@ -72,11 +87,16 @@ const Dashboard = ({ role }) => {
 
   return (
     <div>
-      <h2 className="mb-4" style={{ fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.025em', color: 'var(--text-primary)' }}>Dashboard</h2>
+      <h2 className="mb-4" style={{ fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.025em', color: 'var(--text-primary)' }}>
+        {role === 'admin' ? 'Admin Dashboard' : 'My Assigned Work'}
+      </h2>
       <p className="text-muted" style={{ fontSize: '1rem', marginBottom: '2.5rem' }}>
-        Triage incoming reports, assign field workers, and close the loop with proof.
+        {role === 'admin'
+          ? 'Triage incoming reports, assign field workers, and close the loop with proof.'
+          : 'View and manage the complaints assigned to your region.'}
       </p>
-      
+
+      {/* ====== ADMIN STATS ====== */}
       {role === 'admin' && stats && (
         <div className="stats-grid">
           <div className="stat-card">
@@ -86,7 +106,7 @@ const Dashboard = ({ role }) => {
             </div>
             <div className="stat-value tabular-nums">{stats.total_complaints}</div>
           </div>
-          
+
           <div className="stat-card">
             <div className="stat-card-header">
               <div className="stat-icon red"><ArrowUpRight /></div>
@@ -94,7 +114,7 @@ const Dashboard = ({ role }) => {
             </div>
             <div className="stat-value tabular-nums">{stats.pending_complaints}</div>
           </div>
-          
+
           <div className="stat-card">
             <div className="stat-card-header">
               <div className="stat-icon green"><CheckCircle2 /></div>
@@ -102,7 +122,7 @@ const Dashboard = ({ role }) => {
             </div>
             <div className="stat-value tabular-nums">{stats.resolved_complaints}</div>
           </div>
-          
+
           <div className="stat-card">
             <div className="stat-card-header">
               <div className="stat-icon purple"><AlertTriangle /></div>
@@ -112,10 +132,48 @@ const Dashboard = ({ role }) => {
           </div>
         </div>
       )}
-      
+
+      {/* ====== SUBADMIN STATS (derived from their assigned complaints) ====== */}
+      {role === 'subadmin' && stats && (
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-icon gray"><Inbox /></div>
+              <span className="stat-card-title">Assigned</span>
+            </div>
+            <div className="stat-value tabular-nums">{stats.total}</div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-icon red"><ArrowUpRight /></div>
+              <span className="stat-card-title">Pending</span>
+            </div>
+            <div className="stat-value tabular-nums">{stats.pending}</div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-icon purple"><Clock /></div>
+              <span className="stat-card-title">In Progress</span>
+            </div>
+            <div className="stat-value tabular-nums">{stats.in_progress}</div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-icon green"><CheckCircle2 /></div>
+              <span className="stat-card-title">Resolved</span>
+            </div>
+            <div className="stat-value tabular-nums">{stats.resolved}</div>
+          </div>
+        </div>
+      )}
+
+      {/* ====== RECENT ACTIVITY TABLE ====== */}
       <div className="card">
         <div className="card-header">
-          <h3>Recent Activity</h3>
+          <h3>{role === 'subadmin' ? 'My Assigned Complaints' : 'Recent Activity'}</h3>
         </div>
         <div className="table-container">
           <table>
@@ -131,7 +189,7 @@ const Dashboard = ({ role }) => {
               {recentComplaints.length === 0 ? (
                 <tr>
                   <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                    No complaints found
+                    {role === 'subadmin' ? 'No complaints assigned to your region' : 'No complaints found'}
                   </td>
                 </tr>
               ) : (
