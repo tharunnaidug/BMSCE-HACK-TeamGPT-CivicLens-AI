@@ -32,9 +32,25 @@ const setupDatabase = async () => {
 
         is_deleted BOOLEAN DEFAULT FALSE,
 
+        points INTEGER DEFAULT 0,
+
+        level VARCHAR(50) DEFAULT 'Beginner',
+
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+        await pool.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;
+      `);
+
+        await pool.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS level VARCHAR(50)
+        DEFAULT 'Beginner';
+      `);
+
 
         // ================= SAFE COLUMN UPDATES =================
 
@@ -134,6 +150,13 @@ const setupDatabase = async () => {
     );
   `);
 
+        // ================= REGION COLUMN =================
+
+        await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS region VARCHAR(100);
+  `);
+
         console.log("Tables created successfully");
 
 
@@ -144,11 +167,13 @@ const setupDatabase = async () => {
                 name: "Sub Admin 1",
                 email: "subadmin1@civiclens.com",
                 password: "123456",
+                region: "North Zone",
             },
             {
                 name: "Sub Admin 2",
                 email: "subadmin2@civiclens.com",
                 password: "123456",
+                region: "South Zone",
             },
         ];
 
@@ -174,20 +199,22 @@ const setupDatabase = async () => {
                 await pool.query(
                     `
           INSERT INTO users(
-            name,
-            email,
-            password,
-            role
-          )
+  name,
+  email,
+  password,
+  role,
+  region
+)
 
-          VALUES($1,$2,$3,$4)
+VALUES($1,$2,$3,$4,$5)
           `,
-                    [
-                        admin.name,
-                        admin.email,
-                        hashedPassword,
-                        "sub_admin",
-                    ]
+          [
+            admin.name,
+            admin.email,
+            hashedPassword,
+            "sub_admin",
+            admin.region,
+          ]
                 );
 
                 console.log(

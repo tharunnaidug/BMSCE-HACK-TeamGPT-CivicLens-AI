@@ -1,5 +1,7 @@
 import pool from "../config/db.js";
-
+import {
+    addPoints,
+  } from "../utils/gamification.js";
 
 // ================= GET ALL COMPLAINTS =================
 
@@ -180,6 +182,14 @@ const updateComplaintStatus = async (req, res) => {
                     complaint_id,
                 ]
             );
+
+            if (status === "verified") {
+
+                await addPoints(
+                  complaint.user_id,
+                  20
+                );
+              }
 
         // ================= HISTORY =================
 

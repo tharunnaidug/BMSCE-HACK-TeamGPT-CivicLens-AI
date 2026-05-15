@@ -1,5 +1,7 @@
 import pool from "../config/db.js";
-
+import {
+  addPoints,
+} from "../utils/gamification.js";
 
 // ================= CREATE COMPLAINT =================
 
@@ -61,6 +63,11 @@ const createComplaint = async (req, res) => {
         [existingComplaint.id]
       );
 
+      await addPoints(
+        req.user.id,
+        2
+      );
+
       return res.status(200).json({
         success: true,
         duplicate: true,
@@ -106,6 +113,10 @@ const createComplaint = async (req, res) => {
         longitude,
         severity || "medium",
       ]
+    );
+    await addPoints(
+      req.user.id,
+      10
     );
 
     res.status(201).json({

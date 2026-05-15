@@ -17,9 +17,9 @@ import errorHandler from "./middleware/errorMiddleware.js";
 import complaintRoutes from "./routes/complaintRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
-
+import gamificationRoutes from "./routes/gamificationRoutes.js";
 import subAdminRoutes from "./routes/subAdminRoutes.js";
-
+import userRoutes from "./routes/userRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 dotenv.config();
@@ -56,10 +56,14 @@ app.use("/api/complaints", complaintRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.use("/api/subadmin", subAdminRoutes);
-
+app.use("/api/users", userRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/geo", geoRoutes);
 app.use("/api/notifications",notificationRoutes);
+app.use(
+    "/api/gamification",
+    gamificationRoutes
+  );
 
 // ================= ROOT ROUTE =================
 
