@@ -37,7 +37,7 @@ const createComplaint = async (req, res) => {
       AND ST_DWithin(
         location,
         ST_SetSRID(ST_MakePoint($2,$3),4326)::geography,
-        15
+        10
       )
       AND is_deleted=FALSE
       `,
