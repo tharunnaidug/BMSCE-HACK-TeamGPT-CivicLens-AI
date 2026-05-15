@@ -141,7 +141,7 @@ AI Service (YOLOv8 + FastAPI)
 ## 1️⃣ Clone Repository
 
 ```bash
-git clone YOUR_GITHUB_REPO_URL
+git clone https://github.com/tharunnaidug/BMSCE-HACK-TeamGPT-CivicLens-AI
 ```
 
 ---
