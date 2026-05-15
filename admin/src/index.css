@@ -295,6 +295,18 @@ tbody tr:hover {
 }
 .badge-completed::before { background-color: #15803d; }
 
+.badge-progress {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+.badge-progress::before { background-color: #d97706; }
+
+/* Spinner Animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Image Thumbnails */
 .img-thumb {
   width: 64px;

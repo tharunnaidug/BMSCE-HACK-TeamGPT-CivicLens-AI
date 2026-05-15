@@ -1,12 +1,90 @@
-import React, { useState } from 'react';
-import { Shield, Plus, MapPin, Mail, MoreVertical } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Plus, MapPin, Mail, MoreVertical, Loader2, X } from 'lucide-react';
+import { getAllUsers, createSubAdmin } from '../services/api';
 
-const SubAdmins = ({ subAdmins }) => {
+const SubAdmins = () => {
+  const [subAdmins, setSubAdmins] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+
+  // Create form state
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formPassword, setFormPassword] = useState('');
+  const [formRegion, setFormRegion] = useState('');
+
+  const fetchSubAdmins = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const data = await getAllUsers();
+      const filtered = (data.users || []).filter(u => u.role === 'sub_admin');
+      setSubAdmins(filtered);
+    } catch (err) {
+      setError(err.message || 'Failed to load sub-admins');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubAdmins();
+  }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    setCreateError('');
+
+    try {
+      await createSubAdmin({
+        name: formName,
+        email: formEmail,
+        password: formPassword,
+        region: formRegion,
+        photo_url: '',
+      });
+
+      setShowCreateModal(false);
+      setFormName('');
+      setFormEmail('');
+      setFormPassword('');
+      setFormRegion('');
+      fetchSubAdmins();
+    } catch (err) {
+      setCreateError(err.message || 'Failed to create sub-admin');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '0.75rem', color: 'var(--text-muted)' }}>
+        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+        <span>Loading sub-admins...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#ef4444' }}>
+        <p>{error}</p>
+        <button className="btn btn-outline" onClick={() => window.location.reload()} style={{ marginTop: '1rem' }}>Retry</button>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2>Sub-Administrators</h2>
-        <button className="btn btn-primary">
+        <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
           <Plus size={18} /> Add Sub-Admin
         </button>
       </div>
@@ -19,43 +97,147 @@ const SubAdmins = ({ subAdmins }) => {
                 <th>Admin Name</th>
                 <th>Assigned Region</th>
                 <th>Status</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {subAdmins.map(admin => (
-                <tr key={admin.id}>
-                  <td>
-                    <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{admin.name}</div>
-                    <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                      ID: <span className="font-mono">{admin.id}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                      <Mail size={12} /> {admin.email}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-2 text-muted">
-                      <MapPin size={16} className="logo-icon" style={{ width: '16px', height: '16px' }} />
-                      {admin.region}
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`badge ${admin.status === 'Active' ? 'badge-completed' : 'badge-pending'}`}>
-                      {admin.status}
-                    </span>
-                  </td>
-                  <td>
-                    <button className="btn btn-outline" style={{ padding: '0.25rem' }}>
-                      <MoreVertical size={16} />
-                    </button>
+              {subAdmins.length === 0 ? (
+                <tr>
+                  <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                    No sub-admins found
                   </td>
                 </tr>
-              ))}
+              ) : (
+                subAdmins.map(admin => (
+                  <tr key={admin.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {admin.photo_url ? (
+                          <img src={admin.photo_url} alt={admin.name} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '0.875rem' }}>
+                            {admin.name?.charAt(0)?.toUpperCase() || '?'}
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{admin.name}</div>
+                          <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                            ID: <span className="font-mono">{admin.id}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                            <Mail size={12} /> {admin.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-2 text-muted">
+                        <MapPin size={16} className="logo-icon" style={{ width: '16px', height: '16px' }} />
+                        {admin.region || '—'}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="badge badge-completed">Active</span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Create Sub-Admin Modal */}
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowCreateModal(false); }}>
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0 }}>Add Sub-Administrator</h3>
+              <button className="modal-close" onClick={() => setShowCreateModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreate}>
+              <div className="modal-body">
+                {createError && (
+                  <div style={{ padding: '0.75rem 1rem', marginBottom: '1rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-md)', color: '#ef4444', fontSize: '0.875rem' }}>
+                    {createError}
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label className="form-label">Full Name</label>
+                  <input 
+                    type="text" 
+                    className="text-input" 
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="John Doe"
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Email Address</label>
+                  <input 
+                    type="email" 
+                    className="text-input" 
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
+                    placeholder="john@civiclens.com"
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Password</label>
+                  <input 
+                    type="password" 
+                    className="text-input" 
+                    value={formPassword}
+                    onChange={(e) => setFormPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Region</label>
+                  <input 
+                    type="text" 
+                    className="text-input" 
+                    value={formRegion}
+                    onChange={(e) => setFormRegion(e.target.value)}
+                    placeholder="Downtown, South Wing, etc."
+                    required 
+                  />
+                </div>
+              </div>
+              
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowCreateModal(false)}>Cancel</button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={creating}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  {creating ? (
+                    <>
+                      <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} /> Create Sub-Admin
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

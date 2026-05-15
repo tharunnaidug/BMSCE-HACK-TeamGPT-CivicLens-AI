@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Menu } from 'lucide-react';
-import './App.css'; // This is empty but we import it just in case
+import './App.css';
 import './index.css';
 
-import { mockReports, mockUsers, mockWorkers, mockSubAdmins } from './data/mockData';
+import { logoutAdmin } from './services/api';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -15,44 +15,52 @@ import Login from './components/Login';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [role, setRole] = useState('admin'); // 'admin' or 'subadmin'
+  const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [reports, setReports] = useState(mockReports);
-  const [users] = useState(mockUsers);
-  const [workers] = useState(mockWorkers);
-  const [subAdmins] = useState(mockSubAdmins);
 
-  const handleUpdateReport = (reportId, updates) => {
-    setReports(prevReports => 
-      prevReports.map(report => 
-        report.id === reportId ? { ...report, ...updates } : report
-      )
-    );
-  };
+  // Auto-login from stored token on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
 
-    const renderContent = () => {
+    if (token && storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+        setIsAuthenticated(true);
+      } catch {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
+  }, []);
+
+  const role = user?.role === 'sub_admin' ? 'subadmin' : (user?.role || 'admin');
+
+  const renderContent = () => {
     switch(activeTab) {
       case 'dashboard':
-        return <Dashboard reports={reports} role={role} />;
+        return <Dashboard role={role} />;
       case 'reports':
-        return <Reports reports={reports} workers={workers} onUpdateReport={handleUpdateReport} role={role} />;
+        return <Reports role={role} />;
       case 'users':
-        return <Users users={users} />;
+        return <Users />;
       case 'sub-admins':
-        return <SubAdmins subAdmins={subAdmins} />;
+        return <SubAdmins />;
       default:
-        return <Dashboard reports={reports} role={role} />;
+        return <Dashboard role={role} />;
     }
   };
 
-  const handleLogin = (selectedRole) => {
-    setRole(selectedRole);
+  const handleLogin = (adminUser) => {
+    setUser(adminUser);
     setIsAuthenticated(true);
     setActiveTab('dashboard');
   };
 
   const handleLogout = () => {
+    logoutAdmin();
+    setUser(null);
     setIsAuthenticated(false);
     setActiveTab('dashboard');
   };
