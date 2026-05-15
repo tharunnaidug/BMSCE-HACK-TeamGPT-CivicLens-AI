@@ -208,13 +208,13 @@ const setupDatabase = async () => {
 
 VALUES($1,$2,$3,$4,$5)
           `,
-          [
-            admin.name,
-            admin.email,
-            hashedPassword,
-            "sub_admin",
-            admin.region,
-          ]
+                    [
+                        admin.name,
+                        admin.email,
+                        hashedPassword,
+                        "sub_admin",
+                        admin.region,
+                    ]
                 );
 
                 console.log(
@@ -227,6 +227,56 @@ VALUES($1,$2,$3,$4,$5)
                     `${admin.email} already exists`
                 );
             }
+        }
+
+        // ================= CREATE SUPER ADMIN =================
+
+        const adminExists = await pool.query(
+            `
+    SELECT *
+    FROM users
+    WHERE email=$1
+    `,
+            ["admin@civiclens.com"]
+        );
+
+        if (adminExists.rows.length === 0) {
+
+            const salt = await genSalt(10);
+
+            const hashedPassword = await hash(
+                "admin123",
+                salt
+            );
+
+            await pool.query(
+                `
+      INSERT INTO users(
+        name,
+        email,
+        password,
+        role
+      )
+  
+      VALUES($1,$2,$3,$4)
+      `,
+                [
+                    "Super Admin",
+                    "admin@civiclens.com",
+                    hashedPassword,
+                    "admin",
+                ]
+            );
+
+            console.log(
+                "Super admin created"
+            );
+
+        } else {
+
+            console.log(
+                "Super admin already exists"
+            );
         }
 
         console.log("Database setup completed");

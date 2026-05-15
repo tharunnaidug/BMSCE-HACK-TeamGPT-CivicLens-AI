@@ -1,6 +1,6 @@
 // ================= API SERVICE LAYER =================
 
-const API_BASE = '/api';
+const API_BASE = 'http://localhost:5000/api';
 
 // ================= FETCH WRAPPER =================
 

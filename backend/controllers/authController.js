@@ -9,19 +9,12 @@ import {
 import generateToken from "../utils/generateToken.js";
 
 
-// ================= COOKIE OPTIONS =================
-
-const cookieOptions = {
-  httpOnly: true,
-  secure: false,
-  sameSite: "lax",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
-
-
 // ================= REGISTER =================
 
-const registerUser = async (req, res) => {
+const registerUser = async (
+  req,
+  res
+) => {
   try {
 
     const {
@@ -31,8 +24,6 @@ const registerUser = async (req, res) => {
       photo_url,
     } = req.body;
 
-    console.log(req.body);
-
     if (
       !name ||
       !email ||
@@ -40,79 +31,92 @@ const registerUser = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required",
+        message:
+          "All fields are required",
       });
     }
 
-    // ================= CHECK EXISTING USER =================
+    // ================= CHECK USER =================
 
-    const existingUser = await pool.query(
-      `
-      SELECT * FROM users
-      WHERE email=$1
-      `,
-      [email]
-    );
+    const existingUser =
+      await pool.query(
+        `
+        SELECT *
+        FROM users
+        WHERE email=$1
+        `,
+        [email]
+      );
 
-    if (existingUser.rows.length > 0) {
+    if (
+      existingUser.rows.length > 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "User already exists",
+        message:
+          "User already exists",
       });
     }
 
     // ================= HASH PASSWORD =================
 
-    const salt = await genSalt(10);
+    const salt =
+      await genSalt(10);
 
-    const hashedPassword = await hash(
-      password,
-      salt
-    );
+    const hashedPassword =
+      await hash(
+        password,
+        salt
+      );
 
     // ================= CREATE USER =================
 
-    const newUser = await pool.query(
-      `
-      INSERT INTO users(
+    const newUser =
+      await pool.query(
+        `
+        INSERT INTO users(
+          name,
+          email,
+          password,
+          photo_url
+        )
+
+        VALUES($1,$2,$3,$4)
+
+        RETURNING
+        id,
         name,
         email,
-        password,
-        photo_url
-      )
-
-      VALUES($1,$2,$3,$4)
-
-      RETURNING
-      id,
-      name,
-      email,
-      photo_url,
-      role
-      `,
-      [
-        name,
-        email,
-        hashedPassword,
         photo_url,
-      ]
-    );
+        role
+        `,
+        [
+          name,
+          email,
+          hashedPassword,
+          photo_url,
+        ]
+      );
 
-    const user = newUser.rows[0];
+    const user =
+      newUser.rows[0];
 
-    // ================= GENERATE TOKEN =================
+    const token =
+      generateToken(
+        user.id,
+        user.role
+      );
 
-    const token = generateToken(
-      user.id,
-      user.role
-    );
-
-    // ================= SET COOKIE =================
+    // ================= COOKIE =================
 
     res.cookie(
       "token",
       token,
-      cookieOptions
+      {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+      }
     );
 
     res.status(201).json({
@@ -127,7 +131,8 @@ const registerUser = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Server Error",
+      message:
+        "Server Error",
     });
   }
 };
@@ -135,7 +140,10 @@ const registerUser = async (req, res) => {
 
 // ================= LOGIN =================
 
-const loginUser = async (req, res) => {
+const loginUser = async (
+  req,
+  res
+) => {
   try {
 
     const {
@@ -143,51 +151,66 @@ const loginUser = async (req, res) => {
       password,
     } = req.body;
 
-    const userData = await pool.query(
-      `
-      SELECT *
-      FROM users
+    // ================= FIND USER =================
 
-      WHERE email=$1
-      AND is_deleted=FALSE
-      `,
-      [email]
-    );
+    const userData =
+      await pool.query(
+        `
+        SELECT *
+        FROM users
 
-    if (userData.rows.length === 0) {
+        WHERE email=$1
+
+        AND is_deleted=FALSE
+        `,
+        [email]
+      );
+
+    if (
+      userData.rows.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid credentials",
+        message:
+          "Invalid credentials",
       });
     }
 
-    const user = userData.rows[0];
+    const user =
+      userData.rows[0];
 
-    const isMatch = await compare(
-      password,
-      user.password
-    );
+    // ================= CHECK PASSWORD =================
+
+    const isMatch =
+      await compare(
+        password,
+        user.password
+      );
 
     if (!isMatch) {
       return res.status(400).json({
         success: false,
-        message: "Invalid credentials",
+        message:
+          "Invalid credentials",
       });
     }
 
-    // ================= GENERATE TOKEN =================
+    const token =
+      generateToken(
+        user.id,
+        user.role
+      );
 
-    const token = generateToken(
-      user.id,
-      user.role
-    );
-
-    // ================= SET COOKIE =================
+    // ================= COOKIE =================
 
     res.cookie(
       "token",
       token,
-      cookieOptions
+      {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+      }
     );
 
     res.status(200).json({
@@ -197,8 +220,12 @@ const loginUser = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        photo_url: user.photo_url,
+        photo_url:
+          user.photo_url,
         role: user.role,
+        region: user.region,
+        points: user.points,
+        level: user.level,
       },
 
       token,
@@ -210,7 +237,8 @@ const loginUser = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Server Error",
+      message:
+        "Server Error",
     });
   }
 };
@@ -218,7 +246,10 @@ const loginUser = async (req, res) => {
 
 // ================= ADMIN LOGIN =================
 
-const adminLogin = async (req, res) => {
+const adminLogin = async (
+  req,
+  res
+) => {
   try {
 
     const {
@@ -226,97 +257,85 @@ const adminLogin = async (req, res) => {
       password,
     } = req.body;
 
-    // ================= STATIC ADMIN =================
+    // ================= FIND ADMIN =================
+
+    const adminData =
+      await pool.query(
+        `
+        SELECT *
+        FROM users
+
+        WHERE email=$1
+
+        AND (
+          role='admin'
+          OR role='sub_admin'
+        )
+
+        AND is_deleted=FALSE
+        `,
+        [email]
+      );
 
     if (
-      email === "admin@civiclens.com" &&
-      password === "admin123"
+      adminData.rows.length === 0
     ) {
-
-      const token = generateToken(
-        0,
-        "admin"
-      );
-
-      res.cookie(
-        "token",
-        token,
-        cookieOptions
-      );
-
-      return res.status(200).json({
-        success: true,
-
-        admin: {
-          id: 0,
-          name: "Super Admin",
-          email,
-          role: "admin",
-        },
-
-        token,
-      });
-    }
-
-    // ================= SUB ADMINS =================
-
-    const subAdminData = await pool.query(
-      `
-      SELECT *
-      FROM users
-
-      WHERE email=$1
-      AND role='sub_admin'
-      AND is_deleted=FALSE
-      `,
-      [email]
-    );
-
-    if (subAdminData.rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid credentials",
+        message:
+          "Invalid credentials",
       });
     }
 
-    const subAdmin = subAdminData.rows[0];
+    const admin =
+      adminData.rows[0];
 
-    const isMatch = await compare(
-      password,
-      subAdmin.password
-    );
+    // ================= CHECK PASSWORD =================
+
+    const isMatch =
+      await compare(
+        password,
+        admin.password
+      );
 
     if (!isMatch) {
       return res.status(400).json({
         success: false,
-        message: "Invalid credentials",
+        message:
+          "Invalid credentials",
       });
     }
 
-    // ================= GENERATE TOKEN =================
+    const token =
+      generateToken(
+        admin.id,
+        admin.role
+      );
 
-    const token = generateToken(
-      subAdmin.id,
-      subAdmin.role
-    );
-
-    // ================= SET COOKIE =================
+    // ================= COOKIE =================
 
     res.cookie(
       "token",
       token,
-      cookieOptions
+      {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+      }
     );
 
     res.status(200).json({
       success: true,
 
       admin: {
-        id: subAdmin.id,
-        name: subAdmin.name,
-        email: subAdmin.email,
-        photo_url: subAdmin.photo_url,
-        role: subAdmin.role,
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        photo_url:
+          admin.photo_url,
+        role: admin.role,
+        region:
+          admin.region,
       },
 
       token,
@@ -328,7 +347,8 @@ const adminLogin = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Server Error",
+      message:
+        "Server Error",
     });
   }
 };
@@ -336,28 +356,36 @@ const adminLogin = async (req, res) => {
 
 // ================= GET ME =================
 
-const getMe = async (req, res) => {
+const getMe = async (
+  req,
+  res
+) => {
   try {
 
-    const userData = await pool.query(
-      `
-      SELECT
-      id,
-      name,
-      email,
-      photo_url,
-      role
+    const userData =
+      await pool.query(
+        `
+        SELECT
+        id,
+        name,
+        email,
+        photo_url,
+        role,
+        region,
+        points,
+        level
 
-      FROM users
+        FROM users
 
-      WHERE id=$1
-      `,
-      [req.user.id]
-    );
+        WHERE id=$1
+        `,
+        [req.user.id]
+      );
 
     res.status(200).json({
       success: true,
-      user: userData.rows[0],
+      user:
+        userData.rows[0],
     });
 
   } catch (error) {
@@ -366,7 +394,8 @@ const getMe = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Server Error",
+      message:
+        "Server Error",
     });
   }
 };
@@ -374,14 +403,18 @@ const getMe = async (req, res) => {
 
 // ================= LOGOUT =================
 
-const logoutUser = async (req, res) => {
+const logoutUser = async (
+  req,
+  res
+) => {
   try {
 
     res.clearCookie("token");
 
     res.status(200).json({
       success: true,
-      message: "Logged out successfully",
+      message:
+        "Logged out successfully",
     });
 
   } catch (error) {
@@ -390,13 +423,14 @@ const logoutUser = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Server Error",
+      message:
+        "Server Error",
     });
   }
 };
 
 
-export {
+export default {
   registerUser,
   loginUser,
   adminLogin,
